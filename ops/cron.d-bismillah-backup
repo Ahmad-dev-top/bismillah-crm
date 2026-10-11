@@ -1,0 +1,2 @@
+# Nightly dump. Asia/Karachi 02:00.
+0 2 * * * root TZ=Asia/Karachi sudo -u postgres pg_dump --format=custom --compress=9 -d bismillah -f /var/backups/bismillah/bismillah-nightly.dump

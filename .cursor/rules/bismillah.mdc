@@ -1,0 +1,86 @@
+---
+description: Core invariants for the Bismillah Internet ISP CRM. Read before changing any code.
+globs: ["**/*.ts", "**/*.tsx", "**/*.sql"]
+alwaysApply: true
+---
+
+# Bismillah Internet CRM — rules for AI-assisted changes
+
+This is a **live financial and customer-messaging system** for a Pakistani ISP
+with 548 real customers already loaded. Wrong output here does not produce a
+compiler error — it sends a real person the wrong bill, or the wrong date, or
+sends nothing when it should have. The rules below are not style preferences.
+
+## Never break these
+
+1. **Never write a function that takes a phone number as a send parameter.**
+   `sendNotification(sql, cfg, notificationId)` takes an ID and nothing else.
+   It re-reads the recipient from the row the database already validated. If
+   you find yourself adding a `to:` or `phoneNumber:` argument to anything in
+   the send path, stop — that is the exact bug the architecture prevents.
+
+2. **Never weaken these constraints in `ops/schema.sql`:**
+   - `whatsapp_recipient_belongs_to_customer` — the composite FK
+     `(customer_id, recipient_msisdn) REFERENCES customer_whatsapp_numbers`.
+     This is what makes cross-customer sends impossible.
+   - `whatsapp_one_per_cycle` — partial unique index on
+     `(invoice_id, notification_type)`. This is the duplicate-message guard.
+   - `customer_whatsapp_msisdn_unique` — one number, one customer.
+   - `whatsapp_notification_invoice_guard` trigger.
+   If a constraint blocks your code, the code is wrong, not the constraint.
+
+3. **Never invent customer data.** No default prices, no guessed expiry dates,
+   no placeholder phone numbers, no seeded demo customers. Missing data is
+   recorded in `customers.missing_fields` and the row is marked `INCOMPLETE`.
+   All 548 current customers are INCOMPLETE because the source export had no
+   package or price column. That is correct behaviour, not a bug to "fix".
+
+4. **Never do date arithmetic inline.** Use `@bi/domain`:
+   `cycleEnd`, `cycleFor`, `nextCycle`, `addDays`, `daysBetween`,
+   `todayInKarachi`. Specifically never `date + interval '1 month'` — it walks
+   31 Jan → 28 Feb → 28 Mar and permanently loses the customer's billing day.
+   The anchored version gives 31 Jan → 28 Feb → **31 Mar**.
+
+5. **All billing comparisons use Asia/Karachi calendar dates**, via
+   `todayInKarachi()` or `bi_now_karachi_date()`. Never `new Date()` for a
+   billing decision, never the browser's timezone, never a naive UTC date —
+   Karachi is UTC+5, so UTC is wrong for the first five hours of every day,
+   which is precisely when the midnight expiry job runs.
+
+6. **Money is integer paisa** inside the domain layer (`rupeesToPaisa` /
+   `paisaToRupees`). Floats accumulate error across carried-forward balances.
+
+7. **Phone numbers are normalized to E.164 before any database write.** Use
+   `normalizeMsisdn()`. The `msisdn` domain type rejects anything else.
+
+8. **Secrets come from the environment only** — never `system_settings`,
+   never the repo, never a default value in code.
+
+9. **Template bodies are capped at 1024 characters.** Validate with
+   `validateTemplateBody()` before saving or submitting to Meta.
+
+## Before you commit
+
+```bash
+npm test                                    # 55 domain tests, must stay green
+node --test --experimental-strip-types test/*.test.ts   # needs TEST_DATABASE_URL
+```
+
+72 tests currently pass. A change that breaks one is a change that is wrong
+until proven otherwise.
+
+## Where things live
+
+- `packages/domain/` — pure rules, no I/O, no framework. Every rule with money
+  or a phone number attached lives here so it can be tested exhaustively.
+  **Add new business rules here, not in route handlers.**
+- `apps/api/` — Fastify HTTP + services.
+- `apps/worker/` — BullMQ consumers and scheduler. This is the 24/7 part; it
+  must never depend on a browser or a logged-in user.
+- `ops/` — schema, systemd units, nginx, backups.
+
+## Style
+
+TypeScript strict, ESM, `.ts` extensions in relative imports (Node native type
+stripping — no build step in dev). Zod for request validation. No ORM: the
+`postgres` driver with tagged templates.

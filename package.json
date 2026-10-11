@@ -1,0 +1,22 @@
+{
+  "name": "bismillah-crm",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "test": "npm run test -w @bi/domain",
+    "build": "npm run build -w @bi/domain && npm run build -w @bi/api && npm run build -w @bi/worker && npm run build -w @bi/web",
+    "dev:web": "npm run dev -w @bi/web",
+    "migrate": "psql \"$DATABASE_URL\" -v ON_ERROR_STOP=1 -f ops/schema.sql"
+  },
+  "dependencies": {
+    "postgres": "^3.4.5",
+    "xlsx": "^0.18.5"
+  }
+}

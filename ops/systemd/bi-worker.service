@@ -1,0 +1,35 @@
+[Unit]
+Description=Bismillah Internet CRM background worker
+After=network-online.target postgresql.service redis-server.service
+Wants=network-online.target
+Requires=postgresql.service redis-server.service
+
+[Service]
+Type=simple
+User=bismillah
+Group=bismillah
+WorkingDirectory=/opt/bismillah/current
+# Secrets live here, mode 0600, owned by root:bismillah. Never in the repo,
+# never in the database, never in an environment the logs can print.
+EnvironmentFile=/etc/bismillah/api.env
+Environment=NODE_ENV=production
+Environment=TZ=Asia/Karachi
+ExecStart=/usr/bin/node --experimental-strip-types apps/worker/src/index.ts
+Restart=always
+RestartSec=5
+StandardOutput=append:/var/log/bismillah/worker.log
+StandardError=append:/var/log/bismillah/worker.err.log
+
+# Hardening: the API needs nothing outside its own directory.
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/log/bismillah /var/lib/bismillah
+ProtectKernelTunables=true
+ProtectControlGroups=true
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX AF_NETLINK
+MemoryMax=512M
+
+[Install]
+WantedBy=multi-user.target

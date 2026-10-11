@@ -1,0 +1,28 @@
+# Append to the VM Caddyfile that already serves
+# muhammad-dogar.duckdns.org and documind-ocr.duckdns.org.
+# Caddy runs in Docker, so:
+#   - static files are mounted at /srv/bismillah-web
+#   - API is reached via host.docker.internal (see docker-compose extra_hosts)
+#
+# Host port 3000 is the existing wa-bridge; this API uses 3010.
+
+bismillah-crm.duckdns.org {
+	encode gzip
+
+	handle /api* {
+		reverse_proxy host.docker.internal:3010
+	}
+
+	handle {
+		root * /srv/bismillah-web
+		try_files {path} /index.html
+		file_server
+	}
+
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		-Server
+	}
+}

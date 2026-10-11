@@ -1,0 +1,22 @@
+[Unit]
+Description=Bismillah Internet CRM scheduler (registers repeatable jobs)
+After=network-online.target redis-server.service
+Requires=redis-server.service
+
+[Service]
+# oneshot: this process registers cron entries in Redis and exits. Redis owns
+# the schedule; the worker executes it. Restarting this unit is always safe
+# and never fires a catch-up burst.
+Type=oneshot
+RemainAfterExit=yes
+User=bismillah
+WorkingDirectory=/opt/bismillah/current
+EnvironmentFile=/etc/bismillah/api.env
+Environment=NODE_ENV=production
+Environment=TZ=Asia/Karachi
+ExecStart=/usr/bin/node --experimental-strip-types apps/worker/src/scheduler.ts
+StandardOutput=append:/var/log/bismillah/scheduler.log
+StandardError=append:/var/log/bismillah/scheduler.err.log
+
+[Install]
+WantedBy=multi-user.target

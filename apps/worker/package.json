@@ -1,0 +1,11 @@
+{
+  "name": "@bi/worker",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "start": "node --experimental-strip-types src/index.ts",
+    "scheduler": "node --experimental-strip-types src/scheduler.ts",
+    "build": "tsc -p tsconfig.json"
+  },
+  "dependencies": { "@bi/domain": "*", "@bi/api": "*", "bullmq": "^5.28.1", "ioredis": "^5.4.1", "postgres": "^3.4.5", "pino": "^9.5.0" }
+}
